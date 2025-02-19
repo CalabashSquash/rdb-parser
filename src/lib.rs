@@ -2,7 +2,7 @@ use std::fs;
 
 use nom::{
     bytes::complete::{tag, take},
-    error::{ContextError, Error, ErrorKind, ParseError},
+    error::ErrorKind,
     IResult,
 };
 use variable_length::{parse_length_encoded_string, LengthEncoded};
@@ -43,7 +43,7 @@ pub fn read_file(filename: String) -> Result<(), CustomError> {
     // println!("{remaining:#?} +++++ {parsed:#?}");
     // let (remaining, parsed) = parse_version_number(remaining).expect("Parsing failed");
     // println!("{remaining:#?} +++++ {parsed:#?}");
-    let (remaining, parsed) = parse(bytes).expect("Parsing failed");
+    let (_remaining, parsed) = parse(bytes).expect("Parsing failed");
     println!("Parsed: {parsed:#?}");
     Ok(())
 }
@@ -51,12 +51,12 @@ pub fn read_file(filename: String) -> Result<(), CustomError> {
 fn parse(input: &[u8]) -> IResult<&[u8], Rdb, CustomError> {
     let (remaining, _) = parse_redis_magic_string(input)?;
     let (remaining, version_number) = parse_version_number(remaining)?;
-    let (remaining, (aux)) = parse_opcodes(remaining)?;
+    let (remaining, _) = parse_opcodes(remaining)?;
 
     Ok((remaining, Rdb { version_number }))
 }
 
-fn parse_opcodes(input: &[u8]) -> IResult<&[u8], (Auxiliary), CustomError> {
+fn parse_opcodes(input: &[u8]) -> IResult<&[u8], Auxiliary, CustomError> {
     let mut aux = Auxiliary {
         redis_ver: None,
         redis_bits: None,
@@ -66,9 +66,7 @@ fn parse_opcodes(input: &[u8]) -> IResult<&[u8], (Auxiliary), CustomError> {
     };
     let mut remaining = input;
 
-    let mut temp = 123;
-
-    for i in 0..6 {
+    for _ in 0..6 {
         println!("");
         println!("=========");
         println!("remaining at start of loop: {remaining:X?}");
@@ -85,7 +83,6 @@ fn parse_opcodes(input: &[u8]) -> IResult<&[u8], (Auxiliary), CustomError> {
                 let (new_remaining, new_aux) = parse_aux(remaining, aux)?;
                 remaining = new_remaining;
                 aux = new_aux;
-                temp = 456;
                 println!("Remaining: {:X?}, aux: {:?}", remaining, aux);
             }
             Ok(OpCodes::EOF) => {
@@ -259,17 +256,6 @@ fn parse_aux(input: &[u8], aux: Auxiliary) -> IResult<&[u8], Auxiliary, CustomEr
             )))
         }
     }
-
-    todo!("parse_aux")
-    // Ok((
-    //     input,
-    //     Auxiliary {
-    //         redis_ver: None,
-    //         redis_bits: None,
-    //         ctime: None,
-    //         used_mem: None,
-    //     },
-    // ))
 }
 
 #[cfg(test)]
@@ -278,7 +264,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        read_file(String::from("test.rdb"));
+        read_file(String::from("test.rdb")).expect("TODO error handling");
         // assert_eq!(result, 4);
     }
 }
