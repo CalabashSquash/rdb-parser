@@ -26,8 +26,9 @@ struct Rdb {
 struct Auxiliary {
     redis_ver: Option<String>,
     redis_bits: Option<u32>,
-    ctime: Option<String>,
-    used_mem: Option<String>,
+    ctime: Option<u32>,
+    used_mem: Option<u32>,
+    aof_base: Option<u32>,
 }
 
 pub fn read_file(filename: String) -> Result<(), CustomError> {
@@ -61,12 +62,13 @@ fn parse_opcodes(input: &[u8]) -> IResult<&[u8], (Auxiliary), CustomError> {
         redis_bits: None,
         ctime: None,
         used_mem: None,
+        aof_base: None
     };
     let mut remaining = input;
 
     let mut temp = 123;
 
-    for i in 0..2 {
+    for i in 0..6 {
         println!("");
         println!("=========");
         println!("remaining at start of loop: {remaining:X?}");
@@ -166,7 +168,6 @@ fn parse_aux(input: &[u8], aux: Auxiliary) -> IResult<&[u8], Auxiliary, CustomEr
             ))
         }
         "redis-bits" => {
-            println!("REDIS-BITS");
             let aux_value = match aux_value {
                 LengthEncoded::Number(n) => n,
                 LengthEncoded::String(_) => {
@@ -179,7 +180,6 @@ fn parse_aux(input: &[u8], aux: Auxiliary) -> IResult<&[u8], Auxiliary, CustomEr
                     )
                 }
             };
-            println!("redis-bits: {:?}", aux_value);
             return Ok((
                 remaining,
                 Auxiliary {
@@ -189,14 +189,72 @@ fn parse_aux(input: &[u8], aux: Auxiliary) -> IResult<&[u8], Auxiliary, CustomEr
             ));
         }
         "ctime" => {
-            todo!("")
+            let aux_value = match aux_value {
+                LengthEncoded::Number(n) => n,
+                LengthEncoded::String(_) => {
+                    return Err(
+                        nom::Err::Failure(CustomError::new(
+                            input,
+                            "ctime should never be String",
+                            ErrorKind::TakeTill1,
+                        ))
+                    )
+                }
+            };
+            return Ok((
+                remaining,
+                Auxiliary {
+                    ctime: Some(aux_value),
+                    ..aux
+                },
+            ));
         }
         "used-mem" => {
-            todo!("")
+            let aux_value = match aux_value {
+                LengthEncoded::Number(n) => n,
+                LengthEncoded::String(_) => {
+                    return Err(
+                        nom::Err::Failure(CustomError::new(
+                            input,
+                            "ctime should never be String",
+                            ErrorKind::TakeTill1,
+                        ))
+                    )
+                }
+            };
+            return Ok((
+                remaining,
+                Auxiliary {
+                    used_mem: Some(aux_value),
+                    ..aux
+                },
+            ));
+        },
+        "aof-base" => {
+            let aux_value = match aux_value {
+                LengthEncoded::Number(n) => n,
+                LengthEncoded::String(_) => {
+                    return Err(
+                        nom::Err::Failure(CustomError::new(
+                            input,
+                            "ctime should never be String",
+                            ErrorKind::TakeTill1,
+                        ))
+                    )
+                }
+            };
+            return Ok((
+                remaining,
+                Auxiliary {
+                    aof_base: Some(aux_value),
+                    ..aux
+                },
+            ));
         }
         _ => {
-            return Err(nom::Err::Failure(CustomError::from_error_kind(
+            return Err(nom::Err::Failure(CustomError::new(
                 input,
+                "Invalid or unsupported auxiliary key",
                 ErrorKind::TakeUntil,
             )))
         }

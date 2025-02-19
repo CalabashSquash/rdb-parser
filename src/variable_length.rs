@@ -13,6 +13,8 @@ pub fn parse_length_encoded_string(input: &[u8]) -> IResult<&[u8], LengthEncoded
     let length: u32;
     let start_byte;
     println!("input[0]: {:X?}", input[0]);
+    println!("First half nibble: {:X?}", first_half_nibble);
+    println!("input: {:X?}", input);
     match first_half_nibble {
         0 => {
             // Next 6 bits represent the length
@@ -26,7 +28,7 @@ pub fn parse_length_encoded_string(input: &[u8]) -> IResult<&[u8], LengthEncoded
         },
         2 => {
             // Discard next 6 bits. The next 4 bytes represents the length
-            length = (input[1] as u32) << 24 + (input[2] as u32) << 16  + (input[3] as u32) << 8  + (input[4] as u32);
+            length = ((input[1] as u32) << 24) + ((input[2] as u32) << 16) + ((input[3] as u32) << 8) + (input[4] as u32);
             start_byte = 5;
         },
         3 => {
@@ -51,7 +53,12 @@ pub fn parse_length_encoded_string(input: &[u8]) -> IResult<&[u8], LengthEncoded
                     // 32 bit number
                     length = 4;
                     start_byte = 1;
-                    let num = (input[1] as u32) << 24 + (input[2] as u32) << 16  + (input[3] as u32) << 8  + (input[4] as u32);
+                    let t1 = (input[1] as u32) << 24;
+                    let t2 = (input[2] as u32) << 16;
+                    let t3 = (input[3] as u32) << 8;
+                    let t4 = input[4] as u32;
+                    println!("{},{},{},{}", t1+t2+t3+t4, t2, t3, t4);
+                    let num = ((input[1] as u32) << 24) + ((input[2] as u32) << 16) + ((input[3] as u32) << 8) + (input[4] as u32);
                     return Ok((&input[(start_byte + length) as usize..], LengthEncoded::Number(num)));
                 }
                 3 => {
