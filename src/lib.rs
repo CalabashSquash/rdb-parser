@@ -1,4 +1,4 @@
-use std::fs;
+use std::{collections::HashMap, fs};
 
 use nom::{
     bytes::complete::{tag, take},
@@ -20,6 +20,10 @@ use crate::opcodes::OpCodes;
 #[derive(Debug)]
 struct Rdb {
     version_number: String,
+}
+
+struct Database {
+    store: HashMap<String, String>
 }
 
 #[derive(Debug)]
@@ -68,22 +72,17 @@ fn parse_opcodes(input: &[u8]) -> IResult<&[u8], Auxiliary, CustomError> {
 
     for _ in 0..6 {
         println!("");
-        println!("=========");
-        println!("remaining at start of loop: {remaining:X?}");
         let (new_remaining, next_opcode) = take(1usize)(remaining)?;
         remaining = new_remaining;
 
-        println!("Next opcode: {next_opcode:X?}");
         if next_opcode.len() > 1 {
-            panic!("TODO");
+            todo!("error handling for take(1) returning > 1 length (impossible)");
         }
         match next_opcode[0].try_into() {
             Ok(OpCodes::AUX) => {
-                println!("PRE Remaining: {:X?}, aux: {:?}", remaining, aux);
                 let (new_remaining, new_aux) = parse_aux(remaining, aux)?;
                 remaining = new_remaining;
                 aux = new_aux;
-                println!("Remaining: {:X?}, aux: {:?}", remaining, aux);
             }
             Ok(OpCodes::EOF) => {
                 todo!("EOF")
@@ -98,7 +97,7 @@ fn parse_opcodes(input: &[u8]) -> IResult<&[u8], Auxiliary, CustomError> {
                 todo!("RESIZEDB")
             }
             Ok(OpCodes::SELECTDB) => {
-                todo!("SELECTDB")
+                parse_db(input)?;
             }
             _ => {
                 todo!("Opcode not handled");
@@ -126,7 +125,7 @@ fn parse_version_number(input: &[u8]) -> IResult<&[u8], String, CustomError> {
 }
 
 fn parse_aux(input: &[u8], aux: Auxiliary) -> IResult<&[u8], Auxiliary, CustomError> {
-    let (remaining, aux_key) = parse_length_encoded_string(input)?;
+    let (remaining, aux_key) = parse_length_encoded_string(input, nom::number::Endianness::Little)?;
     let aux_key = match aux_key {
         LengthEncoded::Number(_) => {
             return Err(
@@ -139,7 +138,7 @@ fn parse_aux(input: &[u8], aux: Auxiliary) -> IResult<&[u8], Auxiliary, CustomEr
         },
         LengthEncoded::String(s) => s
     };
-    let (remaining, aux_value) = parse_length_encoded_string(remaining)?;
+    let (remaining, aux_value) = parse_length_encoded_string(remaining, nom::number::Endianness::Little)?;
     println!("aux_key: {aux_key}");
 
     match aux_key.as_str() {
@@ -256,6 +255,11 @@ fn parse_aux(input: &[u8], aux: Auxiliary) -> IResult<&[u8], Auxiliary, CustomEr
             )))
         }
     }
+}
+
+fn parse_db(input: &[u8]) -> IResult<&[u8], Database, CustomError> {
+
+    todo!("parse_db");
 }
 
 #[cfg(test)]

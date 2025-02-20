@@ -1,5 +1,5 @@
 
-use nom::IResult;
+use nom::{number::Endianness, IResult};
 
 use crate::error::CustomError;
 
@@ -8,7 +8,7 @@ pub enum LengthEncoded {
     String(String)
 }
 
-pub fn parse_length_encoded_string(input: &[u8]) -> IResult<&[u8], LengthEncoded, CustomError> {
+pub fn parse_length_encoded_string(input: &[u8], endianness: Endianness) -> IResult<&[u8], LengthEncoded, CustomError> {
     let first_half_nibble = input[0] >> 6;
     let length: u32;
     let start_byte;
@@ -28,7 +28,20 @@ pub fn parse_length_encoded_string(input: &[u8]) -> IResult<&[u8], LengthEncoded
         },
         2 => {
             // Discard next 6 bits. The next 4 bytes represents the length
-            length = ((input[1] as u32) << 24) + ((input[2] as u32) << 16) + ((input[3] as u32) << 8) + (input[4] as u32);
+            match endianness {
+                Endianness::Little => {
+                    length = ((input[1] as u32) << 24) | ((input[2] as u32) << 16) | ((input[3] as u32) << 8) | (input[4] as u32);
+                },
+                Endianness::Big => {
+                    length = ((input[4] as u32) << 24) | ((input[3] as u32) << 16) | ((input[2] as u32) << 8) | (input[1] as u32);
+                },
+                Endianness::Native => {
+                    return Err(
+                        nom::Err::Failure(CustomError::new(input, "endianness can not be Native", nom::error::ErrorKind::AlphaNumeric))
+                    )
+                }
+
+            }
             start_byte = 5;
         },
         3 => {
@@ -53,12 +66,20 @@ pub fn parse_length_encoded_string(input: &[u8]) -> IResult<&[u8], LengthEncoded
                     // 32 bit number
                     length = 4;
                     start_byte = 1;
-                    let t1 = (input[1] as u32) << 24;
-                    let t2 = (input[2] as u32) << 16;
-                    let t3 = (input[3] as u32) << 8;
-                    let t4 = input[4] as u32;
-                    println!("{},{},{},{}", t1+t2+t3+t4, t2, t3, t4);
-                    let num = ((input[1] as u32) << 24) + ((input[2] as u32) << 16) + ((input[3] as u32) << 8) + (input[4] as u32);
+                    let num;
+                    match endianness {
+                        Endianness::Little => {
+                            num = ((input[1] as u32) << 24) | ((input[2] as u32) << 16) | ((input[3] as u32) << 8) | (input[4] as u32);
+                        },
+                        Endianness::Big => {
+                            num = ((input[4] as u32) << 24) | ((input[3] as u32) << 16) | ((input[2] as u32) << 8) | (input[1] as u32);
+                        },
+                        Endianness::Native => {
+                            return Err(
+                                nom::Err::Failure(CustomError::new(input, "endianness can not be Native", nom::error::ErrorKind::AlphaNumeric))
+                            )
+                        }
+                    }
                     return Ok((&input[(start_byte + length) as usize..], LengthEncoded::Number(num)));
                 }
                 3 => {
